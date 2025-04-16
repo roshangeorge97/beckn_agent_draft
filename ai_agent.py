@@ -8,7 +8,7 @@ from prompt_toolkit.styles import Style
 from crewai import Agent, Task, Crew
 from pydantic import ValidationError
 from typing import Dict, List, Tuple, Optional
-from profile_schema import UserProfile, ContactMethod, GeneralInfo, Transportation, Retail, Healthcare, Legal, Hospitality, Education, Entertainment, RealEstate, Fitness, TravelPlanning, Interaction
+from profile_schema import FollowUp, UserProfile, ContactMethod, GeneralInfo, Transportation, Retail, Healthcare, Legal, Hospitality, Education, Entertainment, RealEstate, Fitness, TravelPlanning, Interaction
 from typing import get_origin
 import google.generativeai as genai
 
@@ -264,17 +264,28 @@ class ProfileManager:
         try:
             with open(self.profile_file, 'r') as f:
                 data = json.load(f)
-                # Extract domains data and remove it from the main data
                 domains_data = data.pop('domains', {})
-                # Create UserProfile instance without domains
                 profile = UserProfile(**data)
-                # Manually instantiate specific domain models from raw data
                 for domain, cls in DOMAIN_CLASSES.items():
                     if domain in domains_data:
-                        profile.domains[domain] = cls(**domains_data[domain])
+                        # Ensure follow_ups is properly loaded as a list of FollowUp objects
+                        domain_data = domains_data[domain]
+                        if "follow_up_data" in domain_data:
+                            # Convert old follow_up_data to new follow_ups format (for backward compatibility)
+                            follow_ups = [
+                                FollowUp(
+                                    id=f"follow_up_{i}",
+                                    question=f"Follow-up question {i}",  # Placeholder, as old format didn't store question text
+                                    response=value,
+                                    timestamp=datetime.now().isoformat()
+                                )
+                                for i, (key, value) in enumerate(domain_data["follow_up_data"].items(), 1)
+                            ]
+                            domain_data["follow_ups"] = follow_ups
+                            del domain_data["follow_up_data"]
+                        profile.domains[domain] = cls(**domain_data)
                 return profile
         except (FileNotFoundError, ValidationError, ValueError):
-            # Return a default profile if loading fails
             return UserProfile(
                 user_id=str(uuid.uuid4()),
                 general_info=GeneralInfo(),
@@ -315,10 +326,16 @@ class ProfileManager:
         for key, value in updates.items():
             # Handle follow-up responses
             if key.startswith("follow_up_"):
-                # Ensure follow_up_data exists
-                if not hasattr(domain_obj, 'follow_up_data'):
-                    domain_obj.follow_up_data = {}
-                domain_obj.follow_up_data[key] = value
+                # Extract the follow-up question text and other metadata from the updates
+                # Assuming updates contain question text and timestamp, e.g., {"follow_up_1": {"question": "...", "response": "...", "timestamp": "..."}}
+                if isinstance(value, dict) and "question" in value and "response" in value and "timestamp" in value:
+                    follow_up = FollowUp(
+                        id=key,
+                        question=value["question"],
+                        response=value["response"],
+                        timestamp=value["timestamp"]
+                    )
+                    domain_obj.follow_ups.append(follow_up)
             # Handle nested fields (with dots in the key)
             elif "." in key:
                 parts = key.split(".")
@@ -485,11 +502,11 @@ class AIAgent:
         # Log the original interaction
         self.profile_manager.log_interaction(domain, original_prompt, "Processing request", sub_domain)
         
-        # Collect user answers for the most relevant questions (prioritized by LLM)
-        for q in questions[:15]:  # Limit to top questions to avoid overwhelming
+        # Collect user answers for the most relevant questions
+        for q in questions[:15]:
             answer = self.session.prompt(q["text"] + " ")
             field_id = q["id"]
-            if answer.strip():  # Only store non-empty answers
+            if answer.strip():
                 responses[field_id] = answer.strip()
         
         # Process responses for list fields
@@ -498,13 +515,9 @@ class AIAgent:
         
         for key, value in responses.items():
             if "." in key:
-                # Handle nested fields
-                parent, child = key.split(".", 1)
-                if parent in field_info:
-                    processed_responses[key] = value
+                processed_responses[key] = value
             elif key in field_info:
                 field = field_info[key]
-                # Handle list fields
                 if get_origin(field.annotation) is list and value:
                     processed_responses[key] = [item.strip() for item in value.split(",") if item.strip()]
                 else:
@@ -513,18 +526,23 @@ class AIAgent:
         # Update the domain in the profile manager
         self.profile_manager.update_domain_info(domain, processed_responses)
         
-        # Generate follow-up questions based on the collected information
+        # Generate follow-up questions
         follow_up_questions = self.generate_follow_up_questions(domain, processed_responses, sub_domain, original_prompt)
         
         print("\nThank you for providing that information!")
         print("Let me ask you some follow-up questions to better understand your needs:")
         
-        # Ask the follow-up questions interactively
+        # Ask the follow-up questions interactively and store with metadata
         follow_up_responses = {}
         for i, question in enumerate(follow_up_questions, 1):
             answer = self.session.prompt(f"{i}. {question} ")
             if answer.strip().lower() != 'skip':
-                follow_up_responses[f"follow_up_{i}"] = answer.strip()
+                # Store follow-up with metadata
+                follow_up_responses[f"follow_up_{i}"] = {
+                    "question": question,
+                    "response": answer.strip(),
+                    "timestamp": datetime.now().isoformat()
+                }
         
         # Update profile with follow-up responses
         if follow_up_responses:

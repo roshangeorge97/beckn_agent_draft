@@ -2,6 +2,12 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional, Dict
 from enum import Enum
 
+class FollowUp(BaseModel):
+    id: str
+    question: str
+    response: str
+    timestamp: str
+
 class ContactMethod(str, Enum):
     EMAIL = "email"
     PHONE = "phone"
@@ -42,6 +48,7 @@ class Transportation(DomainBase):
     travel_document_type: Optional[str] = None
     airport_proximity_importance: Optional[str] = None
     emergency_travel_support: Optional[bool] = None
+    follow_ups: List[FollowUp] = []
 
 class Retail(DomainBase):
     preferred_categories: List[str] = Field(default_factory=list)
@@ -62,6 +69,7 @@ class Retail(DomainBase):
     product_reviews_reliance: Optional[str] = None
     preferred_payment_methods: List[str] = Field(default_factory=list)
     wishlist_items: List[str] = Field(default_factory=list)
+    follow_ups: List[FollowUp] = []
 
 class Healthcare(DomainBase):
     preferred_specialties: List[str] = Field(default_factory=list)
@@ -83,6 +91,7 @@ class Healthcare(DomainBase):
     chronic_conditions: List[str] = Field(default_factory=list)
     vaccination_records: List[str] = Field(default_factory=list)
     primary_care_physician: Optional[str] = None
+    follow_ups: List[FollowUp] = []
 
 class Legal(DomainBase):
     preferred_services: List[str] = Field(default_factory=list)
@@ -103,6 +112,7 @@ class Legal(DomainBase):
     legal_tech_usage: Optional[str] = None
     legal_document_storage: Optional[str] = None
     previous_case_outcome: Optional[str] = None
+    follow_ups: List[FollowUp] = []
 
 class Hospitality(DomainBase):
     preferred_cuisine: List[str] = Field(default_factory=list)
@@ -123,6 +133,7 @@ class Hospitality(DomainBase):
     food_allergies: List[str] = Field(default_factory=list)
     preferred_reservation_platform: Optional[str] = None
     pet_friendly_restaurants: Optional[bool] = None
+    follow_ups: List[FollowUp] = []
 
 class Education(DomainBase):
     learning_mode: Optional[str] = None
@@ -143,6 +154,7 @@ class Education(DomainBase):
     assessment_style: Optional[str] = None
     academic_background: Optional[str] = None
     preferred_languages: List[str] = Field(default_factory=list)
+    follow_ups: List[FollowUp] = []
 
 class Entertainment(DomainBase):
     genres: List[str] = Field(default_factory=list)
@@ -163,6 +175,7 @@ class Entertainment(DomainBase):
     interactive_content: Optional[str] = None
     preferred_actors_or_creators: List[str] = Field(default_factory=list)
     rewatch_habits: Optional[bool] = None
+    follow_ups: List[FollowUp] = []
 
 class RealEstate(DomainBase):
     property_type: Optional[str] = None
@@ -183,6 +196,7 @@ class RealEstate(DomainBase):
     community_amenities: List[str] = Field(default_factory=list)
     resale_value_importance: Optional[str] = None
     future_expansion_plan: Optional[bool] = None
+    follow_ups: List[FollowUp] = []
 
 class Fitness(DomainBase):
     activity_type: List[str] = Field(default_factory=list)
@@ -203,6 +217,7 @@ class Fitness(DomainBase):
     injury_history: Optional[str] = None
     workout_duration: Optional[str] = None
     preferred_music_genres: List[str] = Field(default_factory=list)
+    follow_ups: List[FollowUp] = []
 
 class TravelPlanning(DomainBase):
     travel_type: Optional[str] = None
@@ -223,6 +238,7 @@ class TravelPlanning(DomainBase):
     sustainable_travel: Optional[str] = None
     packing_preferences: Optional[str] = None
     language_support_needs: Optional[str] = None
+    follow_ups: List[FollowUp] = []
 
 class GeneralInfo(BaseModel):
     name: Optional[str] = None
